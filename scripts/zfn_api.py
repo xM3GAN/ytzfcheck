@@ -73,7 +73,20 @@ class Client:
             csrf_token = doc("#csrftoken").attr("value")
             pre_cookies = self.sess.cookies.get_dict()
             # 获取publicKey并加密密码
-            req_pubkey = self.sess.get(self.key_url, headers=self.headers, timeout=self.timeout).json()
+            req_pubkey_response = self.sess.get(self.key_url, headers=self.headers, timeout=self.timeout)
+            # 修改JSON解析方式，处理UTF-8 BOM
+            try:
+                # 尝试正常解析
+                req_pubkey = req_pubkey_response.json()
+            except json.decoder.JSONDecodeError:
+                # 如果失败，尝试使用utf-8-sig解析
+                try:
+                    import json
+                    req_pubkey = json.loads(req_pubkey_response.text.encode('utf-8').decode('utf-8-sig'))
+                except Exception as e:
+                    print(f"JSON解析失败: {str(e)}")
+                    return {"code": 2333, "msg": "获取公钥失败，请重试"}
+            
             modulus = req_pubkey["modulus"]
             exponent = req_pubkey["exponent"]
             if str(doc("input#yzm")) == "":
