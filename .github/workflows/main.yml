@@ -62,6 +62,9 @@ jobs:
         env:
           FORCE_PUSH_MESSAGE: ${{ github.event.inputs.force_push_message }}
           GITHUB_ACTIONS: ${{github.actions}}
+          PRE_AUTH_URL: ${{ secrets.PRE_AUTH_URL }}
+          PRE_AUTH_USERNAME: ${{ secrets.PRE_AUTH_USERNAME }}
+          PRE_AUTH_PASSWORD: ${{ secrets.PRE_AUTH_PASSWORD }}
           URL: ${{ secrets.URL }}
           USERNAME: ${{ secrets.USERNAME }}
           PASSWORD: ${{ secrets.PASSWORD }}
