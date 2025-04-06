@@ -124,27 +124,36 @@ def login(url, username, password):
     # 否则执行普通的登录过程
     if session:
         # 已有前置认证会话，尝试直接访问教务系统
+        print("尝试使用前置认证会话访问教务系统...")
         student_client.cookies = cookies
         student_client.sess = session
         # 检查是否可以直接访问教务系统
         try:
             # 简单测试访问，看是否已登录
             test_url = urljoin(base_url, "xtgl/index_initMenu.html")
-            test_resp = session.get(test_url, timeout=timeout)
+            print(f"GET 测试访问教务系统: {test_url}")
+            test_resp = session.get(test_url, timeout=20) # 增加超时时间
+            print(f"GET 测试访问教务系统完成, 状态码: {test_resp.status_code}")
             
             if test_resp.status_code == 200 and "用户登录" not in test_resp.text:
+                print("成功直接访问教务系统")
                 # 成功直接访问教务系统
                 return student_client
+            print("无法直接访问教务系统，可能需要再次登录")
             # 如果无法直接访问，可能需要再次登录教务系统
-        except:
+        except Exception as e:
+            print(f"测试访问教务系统出错: {str(e)}")
             # 访问出错，fallback到普通登录
             pass
     
     # 普通登录逻辑
+    print("执行普通登录逻辑...")
     attempts = 5  # 最大重试次数
     while attempts > 0:
         if cookies == {}:
+            print(f"第 {6 - attempts} 次尝试登录...")
             lgn = student_client.login(username, password)
+            print(f"登录尝试结果: {lgn}")
             if lgn["code"] == 1001:
                 run_log = "登录需要验证码"
 
