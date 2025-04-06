@@ -62,36 +62,52 @@ class Client:
 
     def login(self, sid, password):
         """登录教务系统"""
+        print("进入zfn_api.Client.login方法")
         need_verify = False
         try:
             # 登录页
-            req_csrf = self.sess.get(self.login_url, headers=self.headers, timeout=self.timeout)
+            print("GET 登录页...")
+            req_csrf = self.sess.get(self.login_url, headers=self.headers, timeout=20) # 增加超时时间
+            print(f"GET 登录页完成, 状态码: {req_csrf.status_code}")
             if req_csrf.status_code != 200:
+                print("访问登录页失败")
                 return {"code": 2333, "msg": "教务系统挂了"}
             # 获取csrf_token
+            print("解析登录页...")
             doc = pq(req_csrf.text)
             csrf_token = doc("#csrftoken").attr("value")
             pre_cookies = self.sess.cookies.get_dict()
+            print(f"获取到 CSRF Token: {csrf_token}")
             # 获取publicKey并加密密码
-            req_pubkey_response = self.sess.get(self.key_url, headers=self.headers, timeout=self.timeout)
+            print("GET 公钥...")
+            req_pubkey_response = self.sess.get(self.key_url, headers=self.headers, timeout=20) # 增加超时时间
+            print(f"GET 公钥完成, 状态码: {req_pubkey_response.status_code}")
             # 修改JSON解析方式，处理UTF-8 BOM
             try:
                 # 尝试正常解析
+                print("尝试解析公钥JSON...")
                 req_pubkey = req_pubkey_response.json()
-            except json.decoder.JSONDecodeError:
+                print("解析公钥JSON成功")
+            except json.decoder.JSONDecodeError as e:
+                print(f"正常解析公钥JSON失败: {e}, 尝试使用utf-8-sig解析...")
                 # 如果失败，尝试使用utf-8-sig解析
                 try:
                     import json
                     req_pubkey = json.loads(req_pubkey_response.text.encode('utf-8').decode('utf-8-sig'))
+                    print("使用utf-8-sig解析公钥JSON成功")
                 except Exception as e:
                     print(f"JSON解析失败: {str(e)}")
                     return {"code": 2333, "msg": "获取公钥失败，请重试"}
             
             modulus = req_pubkey["modulus"]
             exponent = req_pubkey["exponent"]
+            print("获取到公钥信息")
             if str(doc("input#yzm")) == "":
+                print("检测到无需验证码")
                 # 不需要验证码
+                print("加密密码...")
                 encrypt_password = self.encrypt_password(password, modulus, exponent)
+                print("密码加密完成")
                 # 登录数据
                 login_data = {
                     "csrftoken": csrf_token,
@@ -99,30 +115,37 @@ class Client:
                     "mm": encrypt_password,
                 }
                 # 请求登录
+                print("POST 登录请求...")
                 req_login = self.sess.post(
                     self.login_url,
                     headers=self.headers,
                     data=login_data,
-                    timeout=self.timeout,
+                    timeout=20, # 增加超时时间
                 )
+                print(f"POST 登录请求完成, 状态码: {req_login.status_code}")
                 doc = pq(req_login.text)
                 tips = doc("p#tips")
                 if str(tips) != "":
+                    print(f"登录失败提示: {tips.text()}")
                     if "用户名或密码" in tips.text():
+                        print("尝试使用原始密码登录...")
                         # 使用原始密码再次尝试登录
                         login_data["mm"] = password
                         req_login = self.sess.post(
                             self.login_url,
                             headers=self.headers,
                             data=login_data,
-                            timeout=self.timeout,
+                            timeout=20, # 增加超时时间
                         )
+                        print(f"POST 原始密码登录请求完成, 状态码: {req_login.status_code}")
                         doc = pq(req_login.text)
                         tips = doc("p#tips")
                         if str(tips) != "":
+                            print(f"原始密码登录失败提示: {tips.text()}")
                             if "用户名或密码" in tips.text():
                                 return {"code": 1002, "msg": "用户名或密码不正确"}
                             return {"code": 998, "msg": tips.text()}
+                        print("原始密码登录成功")
                         self.cookies = self.sess.cookies.get_dict()
                         return {
                             "code": 1000,
@@ -130,15 +153,19 @@ class Client:
                             "data": {"cookies": self.cookies},
                         }
                     return {"code": 998, "msg": tips.text()}
+                print("登录成功")
                 self.cookies = self.sess.cookies.get_dict()
                 return {
                     "code": 1000,
                     "msg": "登录成功",
                     "data": {"cookies": self.cookies},
                 }
+            print("检测到需要验证码")
             # 需要验证码，返回相关页面验证信息给用户，TODO: 增加更多验证方式
             need_verify = True
-            req_kaptcha = self.sess.get(self.kaptcha_url, headers=self.headers, timeout=self.timeout)
+            print("GET 验证码图片...")
+            req_kaptcha = self.sess.get(self.kaptcha_url, headers=self.headers, timeout=20) # 增加超时时间
+            print(f"GET 验证码图片完成, 状态码: {req_kaptcha.status_code}")
             kaptcha_pic = base64.b64encode(req_kaptcha.content).decode()
             return {
                 "code": 1001,
@@ -156,13 +183,15 @@ class Client:
             }
         except exceptions.Timeout:
             msg = "获取验证码超时" if need_verify else "登录超时"
+            print(f"请求超时: {msg}")
             return {"code": 1003, "msg": msg}
         except (
             exceptions.RequestException,
             json.decoder.JSONDecodeError,
             AttributeError,
-        ):
+        ) as e:
             traceback.print_exc()
+            print(f"请求或解析异常: {str(e)}")
             return {
                 "code": 2333,
                 "msg": "请重试，若多次失败可能是系统错误维护或需更新接口",
@@ -170,6 +199,7 @@ class Client:
         except Exception as e:
             traceback.print_exc()
             msg = "获取验证码时未记录的错误" if need_verify else "登录时未记录的错误"
+            print(f"发生未记录的错误: {msg}: {str(e)}")
             return {"code": 999, "msg": f"{msg}：{str(e)}"}
 
     def login_with_kaptcha(self, sid, csrf_token, cookies, password, modulus, exponent, kaptcha, **kwargs):
