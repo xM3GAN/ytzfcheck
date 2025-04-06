@@ -77,6 +77,7 @@ def write_github_summary(run_log, lgn_code):
 def login(url, username, password):
     # 检查是否需要前置认证
     if pre_auth_url and pre_auth_username and pre_auth_password:
+        print("检测到前置认证配置，执行前置认证...")
         # 执行前置认证
         pre_auth_result = perform_pre_auth(
             pre_auth_url, 
@@ -96,7 +97,9 @@ def login(url, username, password):
         # 前置认证成功，使用前置认证的会话继续登录教务系统
         session = pre_auth_result["session"]
         cookies = pre_auth_result["cookies"]
+        print("前置认证成功，继续进行教务系统登录...")
     else:
+        print("未检测到前置认证配置，直接登录教务系统...")
         # 无需前置认证，正常执行
         cookies = {}
         session = None
